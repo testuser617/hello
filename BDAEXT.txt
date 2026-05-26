@@ -1,0 +1,998 @@
+
+Drive Link:
+https://drive.google.com/drive/folders/1qiXWR7vrbC-5J7CHWHWln0Ff2HpIQOzO?usp=drive_link
+
+
+
+
+
+
+=============***1 Basic Hadoop Commands***=============
+
+
+ # START HADOOP SERVICES
+start-all.sh
+# CHECK JAVA PROCESSES
+jps
+# CHECK HADOOP VERSION
+hadoop version
+# LIST FILES IN HDFS ROOT DIRECTORY
+hadoop fs -ls /
+# RECURSIVE LISTING
+hadoop fs -ls -R /
+# CREATE TEXT FILE IN LOCAL SYSTEM
+gedit sample.txt
+# ADD CONTENT INSIDE FILE:
+# Welcome to Big Data Analytics Lab...
+# B.E VI SEM AI&DS
+# SAVE:
+# Ctrl + S
+# CLOSE:
+# Alt + F4
+# CHECK FILE EXISTS
+ls
+# VIEW FILE CONTENT
+cat sample.txt
+# CREATE DIRECTORY IN HDFS
+hadoop fs -mkdir /bda
+# CHECK DIRECTORY
+hadoop fs -ls /
+# UPLOAD FILE FROM LOCAL SYSTEM TO HDFS
+hadoop fs -put sample.txt /bda
+# CHECK FILE IN HDFS
+hadoop fs -ls /bda
+# VIEW FILE CONTENT IN HDFS
+hadoop fs -cat /bda/sample.txt
+# DOWNLOAD FILE FROM HDFS TO LOCAL SYSTEM
+hadoop fs -get /bda/sample.txt Desktop/rmm/sample.txt
+# DELETE FILE FROM HDFS
+hadoop fs -rm /bda/sample.txt
+# CHECK DIRECTORY
+hadoop fs -ls /bda
+# DELETE DIRECTORY RECURSIVELY
+hadoop fs -rm -r /bda
+# RECREATE DIRECTORY
+hadoop fs -mkdir /bda
+# COPY FILE FROM LOCAL TO HDFS
+hadoop fs -copyFromLocal sample.txt /bda
+# COPY FILE FROM HDFS TO LOCAL
+hadoop fs -copyToLocal /bda/sample.txt Desktop/rmm/sample1.txt
+# CHECK DISK USAGE
+hadoop fs -du -s -h /bda
+# READ FILE
+hadoop fs -cat /bda/sample.txt
+# FIRST N LINES
+hadoop fs -cat /bda/sample.txt | head -n 1
+# LAST N LINES
+hadoop fs -cat /bda/sample.txt | tail -n 1
+# APPEND DATA TO FILE
+echo "This is new data" | hadoop fs -appendToFile - /bda/sample.txt
+# CREATE NEW FILE IN HDFS
+echo "Sample Content" | hadoop fs -put - /bda/sample1.txt
+# CREATE NEW DIRECTORY
+hadoop fs -mkdir /bda1
+# COPY FILE WITHIN HDFS
+hadoop fs -cp /bda/sample.txt /bda1
+# CHECK FILE
+hadoop fs -ls /bda1
+# MOVE FILE WITHIN HDFS
+hadoop fs -mv /bda/sample.txt /bda1
+# CHECK MOVED FILE
+hadoop fs -ls /bda1
+
+
+
+
+
+
+
+
+
+
+
+ 
+=============***2 i) WordCount dataset Mapreduce***=============
+
+
+cd ~/Desktop/bda
+nano word.txt  (paste ↓)
+Bus, Car, bus,  car, train, car, bus, car, train, bus, TRAIN,BUS, buS, caR, CAR, car, BUS, TRAIN, Bus, Car, bus, car, train
+CTRL+O, Enter, CTRL+X
+nano wcmap.py (paste code; O,,X)
+nano wcred.py  (paste code; O,,X)
+hadoop@ubuntu22:~/Desktop/bda $ cat word.txt
+python3 wcmap.py <word.txt
+cat word.txt | python3 wcmap.py | sort -k1,1 | python3 wcred.py
+•	Running on Hadoop Cluster:
+start-all.sh    jps
+hadoop fs -mkdir -p /wc
+hadoop fs -copyFromLocal word.txt /wc
+hadoop fs -ls /wc
+hadoop jar /home/hadoop/hadoop/share/hadoop/tools/lib/hadoop-streaming-3.3.6.jar -file wcmap.py -mapper "python3 wcmap.py" -file wcred.py -reducer "python3 wcred.py" -input /wc/word.txt -output /wc/output1
+#Output
+hadoop fs -cat /wc/output1/part-00000
+
+Mapper Python Code:
+#!/usr/bin/env python2
+"""wcmap.py"""
+import sys
+for line in sys.stdin:
+    line = line.strip()
+    words = line.split()
+    for word in words:
+        print('%s\t%s' %(word, 1))
+
+Reducer Python Code:
+#!/usr/bin/env python2
+"""wcred.py"""
+from operator import itemgetter
+import sys
+current_word = None
+current_count = 0
+word = None
+for line in sys.stdin:
+    line = line.strip()
+    word, count = line.split('\t', 1)
+    try:
+        count = int(count)
+    except ValueError:
+        continue
+    if current_word == word:
+        current_count += count
+    else:
+        if current_word:
+            print('%s\t%s' % (current_word, current_count))
+        current_count = count
+        current_word = word
+if current_word == word:
+    print ('%s\t%s' % (current_word, current_count))
+
+
+
+
+
+
+
+
+
+
+
+ 
+=============***2 ii) Weather dataset Mapreduce***=============
+
+
+#Datasetand py files in drive link
+# put weather.txt  &.py files in bda file 
+cd ~/Desktop/bda
+ls
+# VIEW DATASET
+cat weather.txt
+# RUN MAPPER IN LOCAL SYSTEM
+python3 temp-mapper.py < weather.txt
+# RUN MAPREDUCE IN LOCAL SYSTEM
+cat weather.txt | python3 temp-mapper.py | sort | python3 temp-reducer.py
+
+# START HADOOP SERVICES
+start-all.sh
+# CHECK JAVA PROCESSES
+jps
+# CREATE HDFS DIRECTORY
+hadoop fs -mkdir /bda_w
+# UPLOAD DATASET TO HDFS
+hadoop fs -put weather.txt /bda_w
+# CHECK FILE IN HDFS
+hadoop fs -ls /bda_w
+# RUN HADOOP STREAMING MAPREDUCE
+hadoop jar /home/hadoop/hadoop/share/hadoop/tools/lib/hadoop-streaming-3.3.6.jar \
+-file temp-mapper.py \
+-mapper "python3 temp-mapper.py" \
+-file temp-reducer.py \
+-reducer "python3 temp-reducer.py" \
+-input /bda_w/weather.txt \
+-output /bda_w/weather_output
+# VIEW OUTPUT
+hadoop fs -cat /bda_w/weather_output/part-00000
+#OUTPUT:
+20060201	69.45
+20060202	69.72
+20060203	62.85
+20060204	58.77
+
+Mapper Python Code: temp-mapper.py
+#!/usr/bin/env python3
+import sys
+def mapper():
+    for line in sys.stdin:
+        parts = line.split()
+        if len(parts) < 5:
+            continue
+        date = parts[2].split('_')[0]  
+        try:
+            temp = float(parts[3])         
+        except ValueError:
+            continue
+        print(f"{date}\t{temp}")
+if __name__ == "__main__":
+    mapper()
+
+Reducer Python Code: temp-reducer.py
+#!/usr/bin/env python3
+import sys
+from collections import defaultdict
+def reducer():
+    current_key = None
+    max_temp = float('-inf')
+    for line in sys.stdin:
+        key, temp = line.strip().split('\t')
+        temp = float(temp)
+        if key != current_key:
+            if current_key:
+print(f"{current_key}\t{max_temp}")
+            current_key = key
+            max_temp = temp
+        else:
+            max_temp = max(max_temp, temp)
+    if current_key:
+        print(f"{current_key}\t{max_temp}")
+if __name__ == "__main__":
+    reducer()
+ 
+
+
+
+
+
+
+
+=============***2 iii) Uber Dataset Mapreduce***=============
+
+
+#Datasetand py files in drive link
+# GO TO BDA FOLDER
+cd ~/Desktop/bda
+
+# CHECK FILES
+ls
+
+# VIEW DATASETS
+cat uber_data.csv
+cat uber_data_large.csv
+
+# RUN MAPPER IN LOCAL FILE SYSTEM
+python3 uber_mapper.py < uber_data.csv
+
+# RUN MAPREDUCE IN LOCAL FILE SYSTEM
+cat uber_data.csv | python3 uber_mapper.py | sort -k1,1 | python3 uber_reducer.py
+
+# RUN SAME FOR LARGE DATASET
+cat uber_data_large.csv | python3 uber_mapper.py | sort -k1,1 | python3 uber_reducer.py
+
+# START HADOOP SERVICES
+start-all.sh
+
+# CHECK JAVA PROCESSES
+jps
+
+# CREATE HDFS DIRECTORY
+hadoop fs -mkdir /ub
+
+# UPLOAD DATASETS TO HDFS
+hadoop fs -put uber_data.csv /ub
+hadoop fs -put uber_data_large.csv /ub
+
+# CHECK FILES IN HDFS
+hadoop fs -ls /ub
+
+# RUN HADOOP STREAMING MAPREDUCE FOR SMALL DATASET
+hadoop jar /home/hadoop/hadoop/share/hadoop/tools/lib/hadoop-streaming-3.3.6.jar \
+-file uber_mapper.py \
+-mapper "python3 uber_mapper.py" \
+-file uber_reducer.py \
+-reducer "python3 uber_reducer.py" \
+-input /ub/uber_data.csv \
+-output /ub/uber_output1
+
+# VIEW OUTPUT
+hadoop fs -cat /ub/uber_output1/part-00000
+
+# RUN HADOOP STREAMING MAPREDUCE FOR LARGE DATASET
+hadoop jar /home/hadoop/hadoop/share/hadoop/tools/lib/hadoop-streaming-3.3.6.jar \
+-file uber_mapper.py \
+-mapper "python3 uber_mapper.py" \
+-file uber_reducer.py \
+-reducer "python3 uber_reducer.py" \
+-input /ub/uber_data_large.csv \
+-output /ub/uber_output2
+
+# VIEW OUTPUT
+hadoop fs -cat /ub/uber_output2/part-00000
+ 
+
+
+
+
+
+
+
+=============***3 i)To calc max temp weather in Pig***=============
+
+
+cd ~/Desktop/bda
+# CREATE DATASET FILE
+gedit weather_sample.txt
+
+# PASTE DATA:
+1950 0 1
+1950 22 1
+1950 -11 1
+1949 111 1
+1949 78 1
+1949 45 0
+1951 9999 2
+1951 9999 5
+1952 9999 9
+1953 25 0
+
+# SAVE  : Ctrl + S
+# CLOSE : Ctrl + Q
+
+start-all.sh
+jps
+# START PIG IN LOCAL MODE
+pig -x local
+# LOAD DATA
+records = LOAD 'weather_sample.txt'
+AS (year:chararray, temperature:int, quality:int);
+
+# VIEW SCHEMA
+DESCRIBE records;
+
+# DISPLAY RECORDS
+DUMP records;
+
+# FILTER INVALID RECORDS
+filtered_records = FILTER records BY
+temperature != 9999 AND
+quality IN (0,1,4,5,9);
+
+# DISPLAY FILTERED RECORDS
+DUMP filtered_records;
+
+# GROUP RECORDS BY YEAR
+grouped_records = GROUP filtered_records BY year;
+
+# DISPLAY GROUPED RECORDS
+DUMP grouped_records;
+
+# FIND MAX TEMPERATURE
+max_temp = FOREACH grouped_records
+GENERATE group, MAX(filtered_records.temperature);
+
+# DISPLAY OUTPUT
+DUMP max_temp;
+ 
+
+
+
+
+
+
+
+=============***3.ii)  UDF/Eval func students data in Pig***=============
+
+
+cd ~/Desktop/bda
+
+cat > students.txt
+# PASTE DATA:
+Alice,45
+Bob,60
+Charlie,80
+David,30           
+
+# PRESS:
+# Ctrl + D
+
+# CREATE PYTHON UDF FILE
+cat > myudf.py
+
+# PASTE CODE:
+def pass_students(marks):
+    if marks is None:
+        return 'false'
+    return 'true' if int(marks) > 50 else 'false'
+def square(num):
+    if num is None:
+        return 0
+    return int(num) * int(num)  
+# PRESS:
+# Ctrl + D
+
+# START HADOOP SERVICES
+start-all.sh
+jps
+jython --version
+
+# START PIG IN LOCAL MODE
+pig -x local
+# IMPORT UDF SCRIPT
+set script.pig.udf.import.list myudf;
+# REGISTER PYTHON FILE
+REGISTER 'myudf.py' USING jython AS myudf;
+# LOAD STUDENT DATA
+students = LOAD 'students.txt'
+USING PigStorage(',')
+AS (name:chararray, marks:int);
+
+# FILTER & DISPLAY PASSED STUDENTS
+passed_students = FILTER students BY myudf.pass_students(marks) == 'true';
+DUMP passed_students;
+
+# FIND SQUARE OF MARKS
+squared_values = FOREACH students
+GENERATE name, myudf.square(marks);
+
+# DISPLAY OUTPUT
+DUMP squared_values;
+ 
+
+
+
+
+
+
+
+
+
+=============***4 i) HIveQL ***=============
+
+
+cd ~/bda
+# CREATE WEATHER DATASET FILE
+cat > weather_sample.txt
+
+# PASTE DATA:
+10-01-1990	123112	10
+14-02-1991	283901	11
+10-03-1990	381920	15
+10-01-1991	302918	22
+12-02-1990	384902	9
+10-01-1991	123112	11
+14-02-1990	283901	12
+10-03-1991	381920	16
+10-01-1990	302918	23
+12-02-1991	384902	10
+10-01-1993	123112	11
+14-02-1994	283901	12
+10-03-1993	381920	16
+10-01-1994	302918	23
+12-02-1991	384902	10
+10-01-1991	123112	11
+14-02-1990	283901	12
+10-03-1991	381920	16
+10-01-1990	302918	23
+12-02-1991	384902	10
+# Ctrl + D
+
+# START HADOOP SERVICES
+start-all.sh
+
+# START HIVE
+hive
+# CREATE TABLE
+CREATE TABLE weather_data (
+weather_date STRING,
+station_id INT,
+temperature INT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t';
+
+# CHECK TABLES
+SHOW TABLES;
+
+# DESCRIBE TABLE
+DESCRIBE weather_data;
+
+# LOAD DATA INTO TABLE
+LOAD DATA LOCAL INPATH '/home/hadoop/bda/weather_sample.txt'
+INTO TABLE weather_data;
+
+# VIEW DATA
+SELECT * FROM weather_data;
+
+# VIEW FIRST 5 ROWS
+SELECT * FROM weather_data LIMIT 5;
+
+
+
+# CREATE HDFS DIRECTORY FOR EXTERNAL TABLE
+hadoop fs -mkdir -p /user/hive/external/weather_data
+
+# CREATE EXTERNAL TABLE
+CREATE EXTERNAL TABLE weather_external (
+weather_date STRING,
+station_id INT,
+temperature INT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+LOCATION '/user/hive/external/weather_data/';
+
+
+
+# PARTITIONING
+CREATE TABLE weather_partitioned (
+weather_date STRING,
+station_id INT,
+temperature INT
+)
+PARTITIONED BY (year STRING)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t';
+
+ALTER TABLE weather_partitioned
+ADD PARTITION (year='1990');
+
+
+
+# BUCKETING
+CREATE TABLE weather_bucketed (
+weather_date STRING,
+station_id INT,
+temperature INT
+)
+CLUSTERED BY (station_id) INTO 4 BUCKETS
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t';
+
+
+
+# ALTER TABLE
+ALTER TABLE weather_data
+ADD COLUMNS (humidity INT);
+
+
+
+# MAX TEMPERATURE
+SELECT MAX(temperature) FROM weather_data;
+
+# MIN TEMPERATURE
+SELECT MIN(temperature) FROM weather_data;
+
+
+
+# SORTING
+SELECT * FROM weather_data
+ORDER BY temperature DESC;
+
+
+
+# AGGREGATION
+SELECT substr(weather_date,7,4) AS year,
+AVG(temperature)
+FROM weather_data
+GROUP BY substr(weather_date,7,4);
+
+
+
+# CREATE STATION DATASET FILE
+!cat > stationdata.txt
+
+# PASTE DATA:
+123112		NYC
+283901		LA 
+381920		Chicago
+302918		Houston
+384902		Dallas
+# Ctrl + D
+
+
+
+# CREATE SECOND TABLE
+CREATE TABLE station_info (
+station_id INT,
+location STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t';
+
+# LOAD DATA
+LOAD DATA LOCAL INPATH '/home/hadoop/bda/stationdata.txt'
+INTO TABLE station_info;
+
+# JOIN QUERY
+SELECT w.weather_date, w.temperature, s.location
+FROM weather_data w
+JOIN station_info s
+ON w.station_id = s.station_id;
+
+# SUBQUERY
+SELECT * FROM weather_data
+WHERE temperature = (
+SELECT MAX(temperature)
+FROM weather_data
+);
+
+# CREATE VIEW
+CREATE VIEW temp_summary AS
+SELECT station_id,
+AVG(temperature) AS avg_temp
+FROM weather_data
+GROUP BY station_id;
+
+# VIEW DATA
+SELECT * FROM temp_summary;
+
+# DROP TABLE (RUN AT END ONLY IF NEEDED)
+DROP TABLE weather_data;
+
+
+
+
+
+
+
+
+
+
+
+
+=============*** 4 ii) HIveQL User Defined Func***=============
+
+
+
+# CREATE PYTHON UDF FILE
+nano /home/hadoop/strip_udf.py
+
+# PASTE CODE:
+#!/usr/bin/env python3
+import sys
+for line in sys.stdin:
+    print(line.strip().strip('.,!'))
+
+# EXIT  : Ctrl + X
+# SAVE  : Y
+# ENTER : Press Enter
+
+# GIVE EXECUTE PERMISSION
+chmod +x /home/hadoop/strip_udf.py
+
+# UPLOAD FILE TO HDFS
+hdfs dfs -put /home/hadoop/strip_udf.py /user/hadoop/
+
+# GO TO HIVE DIRECTORY
+cd $HIVE_HOME
+
+# START HIVE
+hive
+
+# ADD PYTHON FILE
+ADD FILE /home/hadoop/strip_udf.py;
+
+# CHECK FILE
+LIST FILE;
+
+# CREATE TABLE
+CREATE TABLE my_table (
+text_column STRING
+);
+
+# DESCRIBE TABLE
+DESCRIBE my_table;
+
+# EXIT HIVE
+!exit
+
+# CREATE SAMPLE DATASET FILE
+nano /home/hadoop/sample.txt
+
+# PASTE DATA:
+Hello World!!!
+,Data Processing.,
+Big Data!!
+Python,Hadoop!!
+
+# EXIT  : Ctrl + X
+# SAVE  : Y
+# ENTER : Press Enter
+
+# START HIVE AGAIN
+hive
+
+# LOAD DATA INTO TABLE
+LOAD DATA LOCAL INPATH '/home/hadoop/sample.txt'
+INTO TABLE my_table;
+
+# VIEW TABLE DATA
+SELECT * FROM my_table;
+
+# APPLY UDF USING TRANSFORM
+SELECT TRANSFORM (text_column)
+USING 'python3 strip_udf.py'
+AS (cleaned_text)
+FROM my_table;
+ 
+
+
+
+
+
+
+
+
+
+
+
+=============*** 5 i) SparkSQL ***=============
+
+
+Paste json file from drive in     /home/hadoop/Desktop/SparkSQLrmm/
+
+/home/hadoop/Desktop/SparkSQLrmm/2015-summary.json
+
+# START HADOOP SERVICES
+start-all.sh
+
+# CHECK JAVA PROCESSES
+jps
+
+# GO TO SPARK BIN DIRECTORY
+cd /home/hadoop/spark-3.5.2-bin-hadoop3/bin
+
+# START SPARK SQL
+./spark-sql
+
+# CHECK FILE EXISTS
+ls /home/hadoop/Desktop/SparkSQLrmm/
+
+# CREATE TABLE
+CREATE TABLE flights (
+DEST_COUNTRY_NAME STRING,
+ORIGIN_COUNTRY_NAME STRING,
+count LONG
+)
+USING JSON
+OPTIONS (
+path '/home/hadoop/Desktop/SparkSQLrmm/2015-summary.json'
+);
+
+# DESCRIBE TABLE
+DESCRIBE flights;
+
+# VIEW DATA
+SELECT * FROM flights;
+
+# CASE STATEMENT
+SELECT
+CASE
+WHEN DEST_COUNTRY_NAME = 'UNITED STATES' THEN 1
+WHEN DEST_COUNTRY_NAME = 'Egypt' THEN 0
+ELSE -1
+END
+FROM flights;
+
+# ARRAY EXAMPLE
+SELECT DEST_COUNTRY_NAME,
+ARRAY(1,2,3)
+FROM flights;
+
+# AGGREGATION
+SELECT DEST_COUNTRY_NAME,
+collect_list(count)[0]
+FROM flights
+GROUP BY DEST_COUNTRY_NAME;
+
+# SHOW FUNCTIONS
+SHOW FUNCTIONS;
+
+# SHOW SYSTEM FUNCTIONS
+SHOW SYSTEM FUNCTIONS;
+
+# SHOW USER FUNCTIONS
+SHOW USER FUNCTIONS;
+
+# FUNCTIONS STARTING WITH collect
+SHOW FUNCTIONS LIKE 'collect*';
+# GROUPING + SORTING
+SELECT dest_country_name
+FROM flights
+GROUP BY dest_country_name
+ORDER BY sum(count) DESC
+LIMIT 5; 
+
+
+
+
+
+
+
+
+
+
+=============*** 5 ii) WordCount Application in SCALA***=============
+
+
+# CREATE DATASET FILE
+nano /home/hadoop/spark-3.5.2-bin-hadoop3/Sparkcount.txt
+
+# PASTE DATA:
+Dear Bear River
+Car Car River
+Deer Car Bear
+Dear Deer River
+
+# EXIT  : Ctrl + X
+# SAVE  : Y
+# ENTER : Press Enter
+
+# GO TO SPARK BIN DIRECTORY
+cd /home/hadoop/spark-3.5.2-bin-hadoop3/bin
+
+# START SPARK SHELL
+./spark-shell
+
+# LOAD FILE
+val rdd = spark.sparkContext.textFile("file:///home/hadoop/spark-3.5.2-bin-hadoop3/Sparkcount.txt")
+# VIEW DATA
+rdd.collect()
+# SPLIT WORDS
+val rdd1 = rdd.flatMap(x => x.split(" "))
+# VIEW DATA
+rdd1.collect()
+# MAP WORDS
+val rdd2 = rdd1.map(x => (x,1))
+# VIEW DATA
+rdd2.collect()
+# REDUCE BY KEY
+val rdd3 = rdd2.reduceByKey((x,y) => x+y)
+# DISPLAY OUTPUT
+rdd3.toDF("word","count").show() 
+
+
+
+
+
+
+
+
+
+
+=============*** 5 iii) WordCount Application in PYSPARK***=============
+
+
+# CREATE DATASET FILE
+nano /home/hadoop/spark-3.5.2-bin-hadoop3/Sparkcount.txt
+
+# PASTE DATA:
+Dear Bear River
+Car Car River
+Deer Car Bear
+Dear Deer River
+# EXIT  : Ctrl + X
+# SAVE  : Y
+# ENTER : Press Enter
+
+# GO TO SPARK BIN DIRECTORY
+cd /home/hadoop/spark-3.5.2-bin-hadoop3/bin
+# START PYSPARK
+./pyspark
+
+# LOAD DATA
+input_data = sc.textFile('/home/hadoop/spark-3.5.2-bin-hadoop3/Sparkcount.txt')
+# VIEW DATA
+input_data.collect()
+# SPLIT WORDS
+word_counts = input_data.flatMap(lambda line: line.split(" "))
+# MAP WORDS
+word_counts1 = word_counts.map(lambda word: (word,1))
+# VIEW MAPPED DATA
+word_counts1.collect()
+# REDUCE BY KEY
+final_counts = word_counts1.reduceByKey(lambda a,b: a+b)
+# VIEW FINAL OUTPUT
+final_counts.collect() 
+
+
+
+
+
+
+
+
+
+
+
+=============*** 6.SPARK Streaming ***=============
+
+
+# CREATE SPARK STREAMING PYTHON FILE
+nano /home/hadoop/sparkstream.py
+# PASTE CODE:
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import sum
+from pyspark.sql.types import StructType, StructField, IntegerType, DoubleType
+spark = SparkSession.builder \
+    .appName("RetailStoreStreaming") \
+    .config("spark.ui.showConsoleProgress", "false") \
+    .getOrCreate()
+spark.sparkContext.setLogLevel("ERROR")
+schema = StructType([
+    StructField("ProductID", IntegerType(), True),
+    StructField("Amount", DoubleType(), True)
+])
+input_path = "/home/hadoop/spark_input"
+retail_stream_df = spark \
+    .readStream \
+    .format("csv") \
+    .option("header", "true") \
+    .schema(schema) \
+    .load(input_path)
+processed_df = retail_stream_df.groupBy("ProductID") \
+    .agg(sum("Amount").alias("TotalSales"))
+query = processed_df.writeStream \
+    .outputMode("complete") \
+    .format("console") \
+    .start()
+query.awaitTermination()
+# EXIT  : Ctrl + X
+# SAVE  : Y
+# ENTER : Press Enter
+
+# CREATE INPUT DIRECTORY
+mkdir -p /home/hadoop/spark_input
+
+# CREATE STREAM DATA FILE
+nano /home/hadoop/spark_input/file1.csv
+
+# PASTE DATA:
+ProductID,Amount
+101,250.0
+102,180.5
+103,320.0
+101,100.0
+102,220.0
+104,150.0
+
+# EXIT  : Ctrl + X
+# SAVE  : Y
+# ENTER : Press Enter
+
+# GO TO SPARK BIN DIRECTORY
+cd /home/hadoop/spark-3.5.2-bin-hadoop3/bin
+
+# RUN SPARK STREAMING APPLICATION
+./spark-submit /home/hadoop/sparkstream.py
+
+
+
+
+
+
+
+
+
+ 
+
+=============*** 7.KAFKA ***=============
+
+
+java -version
+ls ~/kafka
+~/kafka/bin/kafka-topics.sh --version
+jps           
+cd ~/kafka       (start server)
+bin/kafka-server-start.sh config/kraft/server.properties 
+# Create Topic NEW TERMINAL
+cd ~/kafka
+bin/kafka-topics.sh --create --topic quickstart-events --bootstrap-server localhost:9092
+#Start Producer NEW TERMINAL
+cd ~/kafka
+bin/kafka-console-producer.sh --topic quickstart-events --bootstrap-server localhost:9092
+# Start Consumer NEW TERMINAL 
+cd ~/kafka
+bin/kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server localhost:9092
+#In producer terminal:
+hello kafka
+big data
+
